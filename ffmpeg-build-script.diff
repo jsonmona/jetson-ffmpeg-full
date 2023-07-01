@@ -1,0 +1,129 @@
+diff --git a/build-ffmpeg b/build-ffmpeg
+index 5bc9168..cc7635a 100755
+--- a/build-ffmpeg
++++ b/build-ffmpeg
+@@ -9,7 +9,7 @@ SCRIPT_VERSION=1.45
+ CWD=$(pwd)
+ PACKAGES="$CWD/packages"
+ WORKSPACE="$CWD/workspace"
+-CFLAGS="-I$WORKSPACE/include"
++CFLAGS="-I$WORKSPACE/include ${CFLAGS:-}"
+ LDFLAGS="-L$WORKSPACE/lib"
+ LDEXEFLAGS=""
+ EXTRALIBS="-ldl -lpthread -lm -lz"
+@@ -301,10 +301,6 @@ if ! command_exists "cargo"; then
+   echo "cargo not installed. rav1e encoder will not be available."
+ fi
+ 
+-if ! command_exists "python3"; then
+-  echo "python3 command not found. Lv2 filter and dav1d decoder will not be available."
+-fi
+-
+ ##
+ ## build tools
+ ##
+@@ -441,40 +437,28 @@ fi
+ ## video library
+ ##
+ 
+-if command_exists "python3"; then
+-  # dav1d needs meson and ninja along with nasm to be built
+-  if command_exists "pip3"; then
+-    # meson and ninja can be installed via pip3
+-    execute pip3 install pip setuptools --quiet --upgrade --no-cache-dir --disable-pip-version-check
+-    for r in meson ninja; do
+-      if ! command_exists ${r}; then
+-        execute pip3 install ${r} --quiet --upgrade --no-cache-dir --disable-pip-version-check
+-      fi
+-      export PATH=$PATH:~/Library/Python/3.9/bin
+-    done
+-  fi
+-  if command_exists "meson"; then
+-    if build "dav1d" "1.1.0"; then
+-      download "https://code.videolan.org/videolan/dav1d/-/archive/1.1.0/dav1d-1.1.0.tar.gz"
+-      make_dir build
+-
+-      CFLAGSBACKUP=$CFLAGS
+-      if $MACOS_M1; then
+-        export CFLAGS="-arch arm64"
+-      fi
++# dav1d needs meson and ninja along with nasm to be built
++if command_exists "meson"; then
++  if build "dav1d" "1.1.0"; then
++    download "https://code.videolan.org/videolan/dav1d/-/archive/1.1.0/dav1d-1.1.0.tar.gz"
++    make_dir build
+ 
+-      execute meson build --prefix="${WORKSPACE}" --buildtype=release --default-library=static --libdir="${WORKSPACE}"/lib
+-      execute ninja -C build
+-      execute ninja -C build install
++    CFLAGSBACKUP=$CFLAGS
++    if $MACOS_M1; then
++      export CFLAGS="-arch arm64"
++    fi
+ 
+-      if $MACOS_M1; then
+-        export CFLAGS=$CFLAGSBACKUP
+-      fi
++    execute meson build --prefix="${WORKSPACE}" --buildtype=release --default-library=static --libdir="${WORKSPACE}"/lib
++    execute ninja -C build
++    execute ninja -C build install
+ 
+-      build_done "dav1d" "1.1.0"
++    if $MACOS_M1; then
++      export CFLAGS=$CFLAGSBACKUP
+     fi
+-    CONFIGURE_OPTIONS+=("--enable-libdav1d")
++
++    build_done "dav1d" "1.1.0"
+   fi
++  CONFIGURE_OPTIONS+=("--enable-libdav1d")
+ fi
+ 
+ if ! $MACOS_M1; then
+@@ -527,34 +511,9 @@ if $NONFREE_AND_GPL; then
+   if build "x265" "3.5"; then
+     download "https://github.com/videolan/x265/archive/Release_3.5.tar.gz" "x265-3.5.tar.gz" # This is actually 3.4 if looking at x265Version.txt
+     cd build/linux || exit
+-    rm -rf 8bit 10bit 12bit 2>/dev/null
+-    mkdir -p 8bit 10bit 12bit
+-    cd 12bit || exit
+-    execute cmake ../../../source -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DENABLE_SHARED=OFF -DBUILD_SHARED_LIBS=OFF -DHIGH_BIT_DEPTH=ON -DENABLE_HDR10_PLUS=ON -DEXPORT_C_API=OFF -DENABLE_CLI=OFF -DMAIN12=ON
+-    execute make -j $MJOBS
+-    cd ../10bit || exit
+-    execute cmake ../../../source -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DENABLE_SHARED=OFF -DBUILD_SHARED_LIBS=OFF -DHIGH_BIT_DEPTH=ON -DENABLE_HDR10_PLUS=ON -DEXPORT_C_API=OFF -DENABLE_CLI=OFF
++    # Disable higher bit depths because they won't build for arm64
++    execute cmake ../../source -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DENABLE_SHARED=OFF -DBUILD_SHARED_LIBS=OFF
+     execute make -j $MJOBS
+-    cd ../8bit || exit
+-    ln -sf ../10bit/libx265.a libx265_main10.a
+-    ln -sf ../12bit/libx265.a libx265_main12.a
+-    execute cmake ../../../source -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DENABLE_SHARED=OFF -DBUILD_SHARED_LIBS=OFF -DEXTRA_LIB="x265_main10.a;x265_main12.a;-ldl" -DEXTRA_LINK_FLAGS=-L. -DLINKED_10BIT=ON -DLINKED_12BIT=ON
+-    execute make -j $MJOBS
+-
+-    mv libx265.a libx265_main.a
+-
+-    if [[ "$OSTYPE" == "darwin"* ]]; then
+-      execute "${MACOS_LIBTOOL}" -static -o libx265.a libx265_main.a libx265_main10.a libx265_main12.a 2>/dev/null
+-    else
+-      execute ar -M <<EOF
+-CREATE libx265.a
+-ADDLIB libx265_main.a
+-ADDLIB libx265_main10.a
+-ADDLIB libx265_main12.a
+-SAVE
+-END
+-EOF
+-    fi
+ 
+     execute make install
+ 
+@@ -913,6 +872,9 @@ fi
+ ## FFmpeg
+ ##
+ 
++# Don't build ffmpeg
++exit
++
+ EXTRA_VERSION=""
+ if [[ "$OSTYPE" == "darwin"* ]]; then
+   EXTRA_VERSION="${FFMPEG_VERSION}"
