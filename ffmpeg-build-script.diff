@@ -1,5 +1,5 @@
 diff --git a/build-ffmpeg b/build-ffmpeg
-index 5bc9168..cc7635a 100755
+index 5bc9168..cb35e43 100755
 --- a/build-ffmpeg
 +++ b/build-ffmpeg
 @@ -9,7 +9,7 @@ SCRIPT_VERSION=1.45
@@ -80,7 +80,7 @@ index 5bc9168..cc7635a 100755
  fi
  
  if ! $MACOS_M1; then
-@@ -527,34 +511,9 @@ if $NONFREE_AND_GPL; then
+@@ -527,35 +511,10 @@ if $NONFREE_AND_GPL; then
    if build "x265" "3.5"; then
      download "https://github.com/videolan/x265/archive/Release_3.5.tar.gz" "x265-3.5.tar.gz" # This is actually 3.4 if looking at x265Version.txt
      cd build/linux || exit
@@ -91,15 +91,15 @@ index 5bc9168..cc7635a 100755
 -    execute make -j $MJOBS
 -    cd ../10bit || exit
 -    execute cmake ../../../source -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DENABLE_SHARED=OFF -DBUILD_SHARED_LIBS=OFF -DHIGH_BIT_DEPTH=ON -DENABLE_HDR10_PLUS=ON -DEXPORT_C_API=OFF -DENABLE_CLI=OFF
-+    # Disable higher bit depths because they won't build for arm64
-+    execute cmake ../../source -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DENABLE_SHARED=OFF -DBUILD_SHARED_LIBS=OFF
-     execute make -j $MJOBS
+-    execute make -j $MJOBS
 -    cd ../8bit || exit
 -    ln -sf ../10bit/libx265.a libx265_main10.a
 -    ln -sf ../12bit/libx265.a libx265_main12.a
 -    execute cmake ../../../source -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DENABLE_SHARED=OFF -DBUILD_SHARED_LIBS=OFF -DEXTRA_LIB="x265_main10.a;x265_main12.a;-ldl" -DEXTRA_LINK_FLAGS=-L. -DLINKED_10BIT=ON -DLINKED_12BIT=ON
--    execute make -j $MJOBS
--
++    # Disable higher bit depths because they won't build for arm64
++    execute cmake ../../source -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DENABLE_SHARED=OFF -DBUILD_SHARED_LIBS=OFF
+     execute make -j $MJOBS
+ 
 -    mv libx265.a libx265_main.a
 -
 -    if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -114,10 +114,21 @@ index 5bc9168..cc7635a 100755
 -END
 -EOF
 -    fi
- 
+-
      execute make install
  
-@@ -913,6 +872,9 @@ fi
+     if [ -n "$LDEXEFLAGS" ]; then
+@@ -823,9 +782,6 @@ if [[ "$OSTYPE" != "darwin"* ]]; then
+     CPPFLAGS=
+     download "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.2.2.tar.gz" "libwebp-1.2.2.tar.gz"
+     execute ./configure --prefix="${WORKSPACE}" --disable-shared --enable-static --disable-dependency-tracking --disable-gl --with-zlib-include="${WORKSPACE}"/include/ --with-zlib-lib="${WORKSPACE}"/lib
+-    make_dir build
+-    cd build || exit
+-    execute cmake -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_BINDIR=bin -DCMAKE_INSTALL_INCLUDEDIR=include -DENABLE_SHARED=OFF -DENABLE_STATIC=ON ../
+     execute make -j $MJOBS
+     execute make install
+ 
+@@ -913,6 +869,9 @@ fi
  ## FFmpeg
  ##
  
